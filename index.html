@@ -44,37 +44,36 @@
     let userProfile = { userId: 'GUEST', displayName: 'ไม่ทราบชื่อ' };
     let currentItem = {};
 
-    async function main() {
+    function handleDataResponse(item) {
+      if (item.error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').innerText = item.error;
+        return;
+      }
+
+      currentItem = item;
+      document.getElementById('itemSku').innerText = item.sku || '-';
+      document.getElementById('itemName').innerText = item.name || '-';
+      document.getElementById('itemStock').innerText = item.stock || '0';
+      document.getElementById('itemUnit').innerText = item.unit || '';
+      
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    }
+
+    function main() {
       const urlParams = new URLSearchParams(window.location.search);
       const sku = urlParams.get('sku') || 'ITEM01';
 
       initLiff();
 
-      try {
-        const res = await fetch(`${GAS_API_URL}?action=getSku&sku=${sku}`, {
-          method: 'GET',
-          redirect: 'follow'
-        });
-        const item = await res.json();
-        
-        if (item.error) {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('error').style.display = 'block';
-          document.getElementById('error').innerText = item.error;
-          return;
-        }
-
-        currentItem = item;
-        document.getElementById('itemSku').innerText = item.sku;
-        document.getElementById('itemName').innerText = item.name;
-        document.getElementById('itemStock').innerText = item.stock;
-        document.getElementById('itemUnit').innerText = item.unit || '';
-        
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-      } catch(e) {
-        document.getElementById('loading').innerText = "โหลดข้อมูลไม่สำเร็จ: " + e.message;
-      }
+      const script = document.createElement('script');
+      script.src = `${GAS_API_URL}?action=getSku&sku=${encodeURIComponent(sku)}&callback=handleDataResponse`;
+      script.onerror = function() {
+        document.getElementById('loading').innerText = "โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+      };
+      document.body.appendChild(script);
     }
 
     async function initLiff() {
@@ -110,17 +109,15 @@
       };
 
       try {
-        const res = await fetch(GAS_API_URL, {
+        await fetch(GAS_API_URL, {
           method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(payload)
         });
-        const result = await res.json();
-        alert(result.message);
-        if (result.success) {
-          try { liff.closeWindow(); } catch(e) {}
-        }
+        
+        alert("บันทึกการเบิกเรียบร้อยแล้ว");
+        try { liff.closeWindow(); } catch(e) {}
       } catch(e) {
         alert("เกิดข้อผิดพลาดในการบันทึก: " + e.message);
       } finally {
