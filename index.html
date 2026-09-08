@@ -1,52 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ฟอร์มเบิกพัสดุ</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #f5f5f5; margin: 0; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
     h2 { color: #06C755; text-align: center; margin-top: 0; }
     .info { margin-bottom: 15px; font-size: 14px; line-height: 1.5; }
     label { font-weight: bold; display: block; margin-top: 10px; }
     input, button { width: 100%; padding: 12px; margin-top: 5px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
     button { background: #06C755; color: white; border: none; font-weight: bold; margin-top: 20px; font-size: 16px; cursor: pointer; }
-    button:disabled { background: #ccc; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
     .error-msg { color: red; text-align: center; font-weight: bold; padding: 10px; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>ฟอร์มเบิกพัสดุ</h2>
-    <div id="loading">กำลังโหลดข้อมูล...</div>
+    <div id="loading" style="text-align:center; padding: 20px;">กำลังโหลดข้อมูล...</div>
     <div id="error" class="error-msg" style="display:none;"></div>
     
     <div id="app" style="display:none;">
-      <p class="info"><strong>ผู้เบิก:</strong> <span id="userName" style="color:#06C755; font-weight:bold;">-</span></p>
+      <p class="info"><strong>ผู้เบิก:</strong> <span id="userName" style="color:#06C755; font-weight:bold;">กำลังโหลด...</span></p>
       <p class="info"><strong>รายการ:</strong> <span id="itemName">-</span> (<span id="itemSku">-</span>)</p>
       <p class="info"><strong>คงเหลือ:</strong> <span id="itemStock">-</span> <span id="itemUnit"></span></p>
       
-      <form id="reqForm">
-        <label>จำนวนที่ต้องการเบิก:</label>
+      <form id="reqForm" onsubmit="event.preventDefault(); handleSave();">
+        <label for="qty">จำนวนที่ต้องการเบิก:</label>
         <input type="number" id="qty" min="1" value="1" required placeholder="ใส่จำนวน">
         
-        <label>หมายเหตุ / แผนก:</label>
+        <label for="note">หมายเหตุ / แผนก:</label>
         <input type="text" id="note" placeholder="ระบุเหตุผลหรือแผนก">
         
-        <button type="button" id="submitBtn" onclick="handleSave()">ยืนยันการเบิกของ</button>
+        <button type="submit" id="submitBtn">ยืนยันการเบิกของ</button>
       </form>
     </div>
   </div>
 
   <script>
+    // ⚠️ แทนที่ด้วย URL ของ Web App Google Apps Script ของคุณ
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbykb_zT--urYL6ZcCvoOe7M2cKYRsRwDny6XWw9Yl5yYOCn9C6IF5FJkfXmC2lwM6mx/exec"; 
+    
     let userProfile = { userId: 'GUEST', displayName: 'ไม่ทราบชื่อ' };
     let currentItem = {};
 
+    // ฟังก์ชันรับข้อมูลพัสดุผ่าน JSONP Callback
     function handleDataResponse(item) {
+      document.getElementById('loading').style.display = 'none';
+      
       if (item.error) {
-        document.getElementById('loading').style.display = 'none';
         document.getElementById('error').style.display = 'block';
         document.getElementById('error').innerText = item.error;
         return;
@@ -58,26 +63,13 @@
       document.getElementById('itemStock').innerText = item.stock || '0';
       document.getElementById('itemUnit').innerText = item.unit || '';
       
-      document.getElementById('loading').style.display = 'none';
       document.getElementById('app').style.display = 'block';
     }
 
-    function main() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sku = urlParams.get('sku') || 'ITEM01';
-
-      initLiff();
-
-      const script = document.createElement('script');
-      script.src = `${GAS_API_URL}?action=getSku&sku=${encodeURIComponent(sku)}&callback=handleDataResponse`;
-      script.onerror = function() {
-        document.getElementById('loading').innerText = "โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
-      };
-      document.body.appendChild(script);
-    }
-
+    // เริ่มต้นระบบ LIFF
     async function initLiff() {
       try {
+        // ⚠️ แทนที่ด้วย LIFF ID ของคุณ
         await liff.init({ liffId: "2011492751-vMAkh829" });
         if (liff.isLoggedIn()) {
           const profile = await liff.getProfile();
@@ -87,15 +79,49 @@
           liff.login();
         }
       } catch(e) { 
-        console.log('LIFF Error:', e);
+        console.error('LIFF Error:', e);
+        document.getElementById('userName').innerText = 'ใช้งานนอกระบบ LINE (Guest)';
       }
+    }
+
+    // ฟังก์ชันหลักเริ่มทำงานตอนเปิดหน้าเว็บ
+    async function main() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sku = urlParams.get('sku') || 'ITEM01';
+
+      // รอ LIFF โหลดโปรไฟล์ให้เสร็จก่อน
+      await initLiff();
+
+      // ดึงข้อมูลสินค้าผ่าน JSONP เพื่อหลีกเลี่ยงปัญหา CORS บน GET
+      const script = document.createElement('script');
+      script.src = `${GAS_API_URL}?action=getSku&sku=${encodeURIComponent(sku)}&callback=handleDataResponse`;
+      script.onerror = function() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').innerText = "โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+      };
+      document.body.appendChild(script);
+    }
+
+    // ฟังก์ชันกดบันทึกการเบิก
     async function handleSave() {
-      const qty = document.getElementById('qty').value;
-      if (!qty || qty <= 0) { alert('กรุณาใส่จำนวนที่ถูกต้อง'); return; }
+      const qtyInput = document.getElementById('qty');
+      const qty = Number(qtyInput.value);
+      const stock = Number(currentItem.stock || 0);
+
+      if (!qty || qty <= 0) { 
+        alert('กรุณาใส่จำนวนที่ต้องการเบิกให้ถูกต้อง'); 
+        return; 
+      }
+
+      if (qty > stock) {
+        alert(`จำนวนที่ขอเบิก (${qty}) เกินกว่าจำนวนคงเหลือในคลัง (${stock})`);
+        return;
+      }
 
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.innerText = 'กำลังบันทึก...';
+      btn.innerText = 'กำลังบันทึกข้อมูล...';
 
       const payload = {
         userId: userProfile.userId,
@@ -107,28 +133,35 @@
       };
 
       try {
-        await fetch(GAS_API_URL, {
+        const response = await fetch(GAS_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
-        
-        alert("บันทึกรายการเบิกพัสดุเรียบร้อยแล้ว!");
-        try { liff.closeWindow(); } catch(e) {}
+
+        const result = await response.json();
+
+        if (result.success) {
+          alert(result.message);
+          if (liff.isInClient()) {
+            liff.closeWindow();
+          } else {
+            window.location.reload();
+          }
+        } else {
+          alert("เกิดข้อผิดพลาด: " + result.message);
+          btn.disabled = false;
+          btn.innerText = 'ยืนยันการเบิกของ';
+        }
+
       } catch(e) {
-        alert("เกิดข้อผิดพลาดในการบันทึก: " + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = 'ยืนยันการเบิกของ';
-      }
-    
-
-
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: " + e.message);
         btn.disabled = false;
         btn.innerText = 'ยืนยันการเบิกของ';
       }
     }
 
+    // เริ่มรันระบบ
     main();
   </script>
 </body>
